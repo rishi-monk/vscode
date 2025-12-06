@@ -1,6 +1,10 @@
+#updated for testing 
+
 name: Code OSS
 
 on:
+  # CHANGED: Added manual trigger
+  workflow_dispatch:
   pull_request:
     branches:
       - main
@@ -10,7 +14,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions: {}
+# CHANGED: strict permissions {} often break forks, enabled read access
+permissions: 
+  contents: read
 
 env:
   VSCODE_QUALITY: 'oss'
@@ -18,13 +24,14 @@ env:
 jobs:
   compile:
     name: Compile & Hygiene
-    runs-on: [ self-hosted, 1ES.Pool=1es-vscode-oss-ubuntu-22.04-x64 ]
+    # CHANGED: Switched from internal self-hosted pool to standard GitHub runner
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout microsoft/vscode
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4 # Note: v6 doesn't exist publicly yet, ensured v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4 # Note: v6 doesn't exist publicly yet, ensured v4
         with:
           node-version-file: .nvmrc
 
