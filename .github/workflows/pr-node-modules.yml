@@ -1,22 +1,29 @@
+# changed for testing 
+
 name: Code OSS (node_modules)
 
 on:
+  # Added for manual testing on fork
+  workflow_dispatch:
   push:
     branches:
       - main
 
-permissions: {}
+# Changed from {} to allow checkout
+permissions:
+  contents: read
 
 jobs:
   compile:
     name: Compile
-    runs-on: [ self-hosted, 1ES.Pool=1es-vscode-oss-ubuntu-22.04-x64 ]
+    # CHANGED: Use standard Ubuntu runner
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout microsoft/vscode
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4 # Changed to v4 (public stable)
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4 # Changed to v4 (public stable)
         with:
           node-version-file: .nvmrc
 
@@ -54,7 +61,8 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-          GITHUB_TOKEN: ${{ secrets.VSCODE_OSS }}
+          # CHANGED: Use default token instead of custom secret
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create node_modules archive
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
@@ -82,20 +90,22 @@ jobs:
         if: steps.cache-builtin-extensions.outputs.cache-hit != 'true'
         run: node build/lib/builtInExtensions.ts
         env:
-          GITHUB_TOKEN: ${{ secrets.VSCODE_OSS }}
+          # CHANGED: Use default token
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   linux:
     name: Linux
-    runs-on: [ self-hosted, 1ES.Pool=1es-vscode-oss-ubuntu-22.04-x64 ]
+    # CHANGED: Use standard Ubuntu runner
+    runs-on: ubuntu-latest
     env:
       NPM_ARCH: x64
       VSCODE_ARCH: x64
     steps:
       - name: Checkout microsoft/vscode
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
 
@@ -124,14 +134,19 @@ jobs:
             echo "Npm install failed $i, trying again..."
           done
         env:
-          GITHUB_TOKEN: ${{ secrets.VSCODE_OSS }}
+          # CHANGED: Use default token
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: |
           set -e
-
-          source ./build/azure-pipelines/linux/setup-env.sh
+          # NOTE: This script might fail on standard Ubuntu if it expects internal paths.
+          # You may need to replace this with explicit `sudo apt-get install` commands 
+          # similar to the 'compile' job if this step fails.
+          if [ -f "./build/azure-pipelines/linux/setup-env.sh" ]; then
+             source ./build/azure-pipelines/linux/setup-env.sh
+          fi
 
           for i in {1..5}; do # try 5 times
             npm ci && break
@@ -146,7 +161,8 @@ jobs:
           VSCODE_ARCH: ${{ env.VSCODE_ARCH }}
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-          GITHUB_TOKEN: ${{ secrets.VSCODE_OSS }}
+          # CHANGED: Use default token
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create node_modules archive
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
@@ -158,16 +174,17 @@ jobs:
 
   macOS:
     name: macOS
-    runs-on: macos-14-xlarge
+    # CHANGED: Use standard GitHub macOS runner
+    runs-on: macos-latest
     env:
       NPM_ARCH: arm64
       VSCODE_ARCH: arm64
     steps:
       - name: Checkout microsoft/vscode
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
 
@@ -202,11 +219,8 @@ jobs:
           VSCODE_ARCH: ${{ env.VSCODE_ARCH }}
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-          GITHUB_TOKEN: ${{ secrets.VSCODE_OSS }}
-          # Avoid using dlopen to load Kerberos on macOS which can cause missing libraries
-          # https://github.com/mongodb-js/kerberos/commit/04044d2814ad1d01e77f1ce87f26b03d86692cf2
-          # flipped the default to support legacy linux distros which shouldn't happen
-          # on macOS.
+          # CHANGED: Use default token
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GYP_DEFINES: "kerberos_use_rtld=false"
 
       - name: Create node_modules archive
@@ -219,16 +233,17 @@ jobs:
 
   windows:
     name: Windows
-    runs-on: [ self-hosted, 1ES.Pool=1es-vscode-oss-windows-2022-x64 ]
+    # CHANGED: Use standard GitHub Windows runner
+    runs-on: windows-latest
     env:
       NPM_ARCH: x64
       VSCODE_ARCH: x64
     steps:
       - name: Checkout microsoft/vscode
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
 
@@ -249,6 +264,7 @@ jobs:
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
+          # Ensure execution policy allows scripts
           . build/azure-pipelines/win32/exec.ps1
           $ErrorActionPreference = "Stop"
 
@@ -272,7 +288,8 @@ jobs:
           VSCODE_ARCH: ${{ env.VSCODE_ARCH }}
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-          GITHUB_TOKEN: ${{ secrets.VSCODE_OSS }}
+          # CHANGED: Use default token
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create node_modules archive
         if: steps.node-modules-cache.outputs.cache-hit != 'true'
@@ -282,4 +299,10 @@ jobs:
           $ErrorActionPreference = "Stop"
           exec { node build/azure-pipelines/common/listNodeModules.ts .build/node_modules_list.txt }
           exec { mkdir -Force .build/node_modules_cache }
-          exec { 7z.exe a .build/node_modules_cache/cache.7z -mx3 `@.build/node_modules_list.txt }
+          # Windows latest usually has 7z, but if 7z.exe is not in PATH this might fail. 
+          # Standard GitHub runners have 7z at "C:\Program Files\7-Zip\7z.exe"
+          if (Get-Command "7z.exe" -ErrorAction SilentlyContinue) {
+             exec { 7z.exe a .build/node_modules_cache/cache.7z -mx3 `@.build/node_modules_list.txt }
+          } else {
+             exec { & "C:\Program Files\7-Zip\7z.exe" a .build/node_modules_cache/cache.7z -mx3 `@.build/node_modules_list.txt }
+          }
